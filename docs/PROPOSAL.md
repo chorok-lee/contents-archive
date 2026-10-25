@@ -59,7 +59,7 @@ EntryTag { entryId, tagId }
 - 배포: Vercel
 
 ## 6. 디자인 시스템
-후보와 URL은 [DESIGN_SOURCES.md](./DESIGN_SOURCES.md)에 정리했다. 비교해 보고 결정한다.
+후보와 URL은 [DESIGN_SOURCES.md](./DESIGN_SOURCES.md)에 정리했다. MVP는 awesome-design-md의 Notion 스타일(`/DESIGN.md`)로 시작했다.
 
 ## 7. 다음 단계
 1. 디자인 시스템 결정 → 토큰과 폰트 설정

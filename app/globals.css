@@ -1,0 +1,229 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens from DESIGN.md (Notion-inspired, VoltAgent/awesome-design-md, MIT).
+ * Pretendard stands in for Notion Sans: its Latin glyphs are Inter-based and it covers Hangul.
+ */
+@theme {
+  --font-sans: "Pretendard Variable", Pretendard, Inter, -apple-system, system-ui,
+    "Segoe UI", Helvetica, sans-serif;
+
+  --color-primary: #5645d4;
+  --color-primary-pressed: #4534b3;
+  --color-primary-deep: #3a2a99;
+  --color-link: #0075de;
+  --color-link-pressed: #005bab;
+
+  --color-canvas: #ffffff;
+  --color-surface: #f6f5f4;
+  --color-surface-soft: #fafaf9;
+  --color-hairline: #e5e3df;
+  --color-hairline-soft: #ede9e4;
+  --color-hairline-strong: #c8c4be;
+
+  --color-ink: #1a1a1a;
+  --color-charcoal: #37352f;
+  --color-slate: #5d5b54;
+  --color-steel: #787671;
+  --color-stone: #a4a097;
+  --color-muted: #bbb8b1;
+
+  --color-tint-peach: #ffe8d4;
+  --color-tint-rose: #fde0ec;
+  --color-tint-mint: #d9f3e1;
+  --color-tint-lavender: #e6e0f5;
+  --color-tint-sky: #dcecfa;
+  --color-tint-yellow: #fef7d6;
+  --color-tint-cream: #f8f5e8;
+  --color-tint-gray: #f0eeec;
+  --color-purple-300: #d6b6f6;
+  --color-purple-800: #391c57;
+
+  --color-success: #1aae39;
+  --color-warning: #dd5b00;
+  --color-error: #e03131;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  --shadow-subtle: rgba(15, 15, 15, 0.04) 0px 1px 2px 0px;
+  --shadow-card: rgba(15, 15, 15, 0.08) 0px 4px 12px 0px;
+  --shadow-modal: rgba(15, 15, 15, 0.16) 0px 16px 48px -8px;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 10px 18px;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: nowrap;
+    transition: background-color 150ms ease, border-color 150ms ease;
+  }
+  .btn-primary {
+    background: var(--color-primary);
+    color: #fff;
+  }
+  .btn-primary:hover,
+  .btn-primary:active {
+    background: var(--color-primary-pressed);
+  }
+  .btn-primary:disabled {
+    background: var(--color-hairline);
+    color: var(--color-muted);
+  }
+  .btn-secondary {
+    border: 1px solid var(--color-hairline-strong);
+    color: var(--color-ink);
+  }
+  .btn-secondary:hover {
+    background: var(--color-surface);
+  }
+  .btn-ghost {
+    min-height: 36px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    color: var(--color-ink);
+  }
+  .btn-ghost:hover {
+    background: var(--color-surface);
+  }
+
+  .input {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 1px solid var(--color-hairline-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-size: 16px;
+  }
+  .input::placeholder {
+    color: var(--color-muted);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+  }
+  .input-search {
+    background: var(--color-surface);
+    border-color: var(--color-hairline);
+  }
+
+  .label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-charcoal);
+  }
+
+  .card {
+    background: var(--color-canvas);
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-lg);
+  }
+
+  .pill-tab {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    padding: 6px 14px;
+    border: 1px solid var(--color-hairline);
+    border-radius: 9999px;
+    color: var(--color-steel);
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .pill-tab:hover {
+    color: var(--color-ink);
+  }
+  .pill-tab[aria-current="true"] {
+    background: #000;
+    border-color: #000;
+    color: #fff;
+  }
+
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--color-tint-lavender);
+    color: var(--color-purple-800);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .segmented-tab {
+    padding: 8px 4px;
+    border-bottom: 2px solid transparent;
+    color: var(--color-steel);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .segmented-tab[aria-selected="true"] {
+    border-bottom-color: var(--color-ink);
+    color: var(--color-ink);
+  }
+
+  .prose-note {
+    color: var(--color-charcoal);
+    font-size: 16px;
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+  }
+  .prose-note > * + * {
+    margin-top: 0.9em;
+  }
+  .prose-note h1,
+  .prose-note h2,
+  .prose-note h3 {
+    color: var(--color-ink);
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .prose-note h1 { font-size: 22px; }
+  .prose-note h2 { font-size: 19px; }
+  .prose-note h3 { font-size: 17px; }
+  .prose-note ul { list-style: disc; padding-left: 1.4em; }
+  .prose-note ol { list-style: decimal; padding-left: 1.4em; }
+  .prose-note a { color: var(--color-link); text-decoration: underline; }
+  .prose-note blockquote {
+    border-left: 3px solid var(--color-ink);
+    padding-left: 14px;
+  }
+  .prose-note code {
+    background: var(--color-surface);
+    border-radius: var(--radius-xs);
+    padding: 1px 5px;
+    font-size: 0.9em;
+  }
+  .prose-note strong { color: var(--color-ink); font-weight: 600; }
+}
