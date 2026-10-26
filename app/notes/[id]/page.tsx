@@ -6,23 +6,24 @@ import { DeleteNoteButton } from "@/components/DeleteNoteButton";
 import { ReflectionEditor } from "@/components/ReflectionEditor";
 import { formatDateLabel, toDateKey } from "@/lib/dates";
 import { getNote } from "@/lib/notes";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
-function load(id: string) {
+async function load(id: string) {
   const n = Number(id);
-  return Number.isInteger(n) && n > 0 ? getNote(n) : null;
+  return isSupabaseConfigured() && Number.isInteger(n) && n > 0 ? getNote(n) : null;
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const note = load((await params).id);
+  const note = await load((await params).id);
   return { title: note?.article.title ?? "기록" };
 }
 
 export default async function NotePage({ params }: Params) {
-  const note = load((await params).id);
+  const note = await load((await params).id);
   if (!note) notFound();
 
   return (

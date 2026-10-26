@@ -4,6 +4,8 @@ import { NoteCard } from "@/components/NoteCard";
 import { formatDateLabel, toDateKey } from "@/lib/dates";
 import { isKeyword } from "@/lib/keywords";
 import { keywordCounts, listNotes, type Note } from "@/lib/notes";
+import { SetupNotice } from "@/components/SetupNotice";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 export const metadata: Metadata = { title: "모아보기" };
 export const dynamic = "force-dynamic";
@@ -13,11 +15,11 @@ export default async function ArchivePage({
 }: {
   searchParams: Promise<{ k?: string }>;
 }) {
+  if (!isSupabaseConfigured()) return <SetupNotice />;
   const { k } = await searchParams;
   const active = isKeyword(k) ? k : undefined;
-  const notes = listNotes(active);
-  const chips = keywordCounts();
-  const total = chips.length ? listNotes().length : notes.length;
+  const [notes, chips] = await Promise.all([listNotes(active), keywordCounts()]);
+  const total = active ? (await listNotes()).length : notes.length;
 
   const groups = new Map<string, Note[]>();
   for (const note of notes) {

@@ -30,14 +30,14 @@
 
 ## 3. 데이터 모델
 ```
-articles      { id, url(unique), title, site_name, image, description, body_text, summary(JSON), summarized_by, fetched_at }
+articles      { id, url(unique), title, site_name, image, description, body_text, summary(text[]), summarized_by, fetched_at }
 notes         { id, article_id, reflection, created_at, updated_at }
 note_keywords { note_id, keyword }
 ```
 
 ## 4. 기술 스택
 - Next.js (App Router) + TypeScript, Tailwind v4
-- SQLite(better-sqlite3) 로컬 저장. 배포가 필요해지면 Supabase로 이전
+- Supabase(Postgres) 저장, Vercel 배포. 연결 방법은 [SUPABASE.md](./SUPABASE.md)
 - 본문 추출: `@mozilla/readability` + `linkedom`
 - 요약·키워드: Claude API(`@anthropic-ai/sdk`, 구조화 출력)
 
@@ -47,4 +47,4 @@ note_keywords { note_id, keyword }
 ## 6. 다음에 고려할 것
 - "N일 전 오늘" 다시 보기, 주간 회고
 - 브라우저 확장·모바일 공유 시트로 URL 보내기
-- 배포(Supabase 이전, 로그인)
+- 접근 보호(비밀번호 또는 Supabase Auth)

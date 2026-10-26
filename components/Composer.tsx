@@ -75,27 +75,41 @@ export function Composer() {
 
   return (
     <div className="flex flex-col gap-6">
-      <form onSubmit={onSubmitUrl} className="flex gap-2">
-        <label htmlFor="url-input" className="sr-only">
-          아티클 URL
-        </label>
-        <input
-          id="url-input"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onPaste={onPaste}
-          type="text"
-          inputMode="url"
-          autoComplete="off"
-          autoFocus
-          placeholder="읽은 글의 URL을 붙여넣으세요"
-          className="input min-h-12 flex-1 text-[17px]"
-        />
-        {(result || error) && (
-          <button type="button" onClick={reset} className="btn btn-ghost text-steel" aria-label="지우기">
-            ✕
-          </button>
-        )}
+      <form onSubmit={onSubmitUrl} className="flex flex-col gap-3">
+        <div className="relative">
+          <label htmlFor="url-input" className="sr-only">
+            아티클 URL
+          </label>
+          <span aria-hidden className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-steel">
+            <LinkIcon />
+          </span>
+          <input
+            id="url-input"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onPaste={onPaste}
+            type="text"
+            inputMode="url"
+            enterKeyHint="go"
+            autoComplete="off"
+            autoFocus
+            placeholder="https://"
+            className="input input-search min-h-14 px-12 text-[17px]"
+          />
+          {url && (
+            <button
+              type="button"
+              onClick={reset}
+              aria-label="입력 지우기"
+              className="absolute top-1/2 right-3 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-stone/40 text-[13px] text-canvas hover:bg-stone/60"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        <button type="submit" disabled={analyzing || !url.trim()} className="btn btn-primary min-h-13 w-full text-[16px]">
+          {analyzing ? "글을 읽는 중…" : "＋ 요약하기"}
+        </button>
       </form>
 
       {savedId && (
@@ -181,6 +195,15 @@ export function Composer() {
         </>
       )}
     </div>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
   );
 }
 
