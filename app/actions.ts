@@ -2,96 +2,114 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { todayKey } from "@/lib/dates";
+import { extractKeywords, summarize } from "@/lib/ai";
+import { fetchArticle, normalizeUrl } from "@/lib/extract";
 import {
-  createEntry,
-  deleteEntry,
-  updateEntry,
-  type EntryInput,
-} from "@/lib/entries";
-import { normalizeUrl } from "@/lib/metadata";
-import { isMood } from "@/lib/moods";
+  createNote,
+  deleteNote,
+  findNoteIdByUrl,
+  getArticle,
+  getArticleByUrl,
+  getNote,
+  saveArticle,
+  updateNote,
+  type Article,
+} from "@/lib/notes";
 
-export interface SaveState {
-  error?: string;
+export type AnalyzeResult =
+  | {
+      ok: true;
+      article: Pick<Article, "id" | "url" | "title" | "siteName" | "image">;
+      summary: string[];
+      fetchFailed: boolean;
+      existingNoteId: number | null;
+    }
+  | { ok: false; error: string };
+
+async function loadArticle(url: string): Promise<{ article: Article; fetchFailed: boolean }> {
+  const cached = getArticleByUrl(url);
+  if (cached?.bodyText) return { article: cached, fetchFailed: false };
+
+  const fetched = await fetchArticle(url);
+  if (!fetched) {
+    const fallback =
+      cached ??
+      saveArticle({
+        url,
+        title: new URL(url).hostname.replace(/^www\./, ""),
+        siteName: null,
+        image: null,
+        description: null,
+        bodyText: "",
+        summary: [],
+        summarizedBy: "rule",
+      });
+    return { article: fallback, fetchFailed: true };
+  }
+
+  const { lines, by } = await summarize(fetched.title, fetched.description, fetched.bodyText);
+  const article = saveArticle({ ...fetched, summary: lines, summarizedBy: by });
+  return { article, fetchFailed: false };
 }
 
-function text(form: FormData, key: string): string {
-  const value = form.get(key);
-  return typeof value === "string" ? value.trim() : "";
-}
+export async function analyzeUrl(raw: string): Promise<AnalyzeResult> {
+  const url = normalizeUrl(raw);
+  if (!url) return { ok: false, error: "올바른 URL이 아니에요. 주소를 다시 확인해 주세요." };
 
-function optional(form: FormData, key: string): string | null {
-  return text(form, key) || null;
-}
-
-function parseEntry(form: FormData): EntryInput | string {
-  const url = normalizeUrl(text(form, "url"));
-  if (!url) return "올바른 URL을 입력해 주세요.";
-
-  const title = text(form, "title");
-  if (!title) return "글 제목을 입력해 주세요.";
-
-  const status = text(form, "status") === "to_read" ? "to_read" : "read";
-  const summary = text(form, "summary");
-  if (status === "read" && !summary) return "한 줄 요약을 적어 주세요.";
-  if (summary.length > 140) return "한 줄 요약은 140자 이내로 적어 주세요.";
-
-  const readOn = text(form, "readOn");
-  const mood = text(form, "mood");
-  const minutes = Number.parseInt(text(form, "readingMinutes"), 10);
-
+  const { article, fetchFailed } = await loadArticle(url);
   return {
-    url,
-    title,
-    description: optional(form, "description"),
-    image: optional(form, "image"),
-    siteName: optional(form, "siteName"),
-    author: optional(form, "author"),
-    publishedAt: optional(form, "publishedAt"),
-    readingMinutes: Number.isFinite(minutes) && minutes > 0 ? minutes : null,
-    summary,
-    reflection: text(form, "reflection"),
-    mood: isMood(mood) ? mood : null,
-    status,
-    readOn: /^\d{4}-\d{2}-\d{2}$/.test(readOn) ? readOn : todayKey(),
-    quotes: form
-      .getAll("quote")
-      .map((q) => String(q).trim())
-      .filter(Boolean),
-    tags: [
-      ...new Set(
-        text(form, "tags")
-          .split(",")
-          .map((t) => t.trim().replace(/^#/, ""))
-          .filter(Boolean),
-      ),
-    ],
+    ok: true,
+    article: {
+      id: article.id,
+      url: article.url,
+      title: article.title,
+      siteName: article.siteName,
+      image: article.image,
+    },
+    summary: article.summary,
+    fetchFailed,
+    existingNoteId: findNoteIdByUrl(url),
   };
 }
 
-export async function saveEntry(
-  _prev: SaveState,
-  form: FormData,
-): Promise<SaveState> {
-  const input = parseEntry(form);
-  if (typeof input === "string") return { error: input };
+export async function saveNote(
+  articleId: number,
+  reflection: string,
+): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
+  const text = reflection.trim();
+  if (!text) return { ok: false, error: "느낀 점을 한 줄이라도 적어 주세요." };
+  const article = getArticle(articleId);
+  if (!article) return { ok: false, error: "글 정보를 찾지 못했어요. URL을 다시 붙여넣어 주세요." };
 
-  const idValue = Number(text(form, "id"));
-  let id: number;
-  if (Number.isInteger(idValue) && idValue > 0) {
-    updateEntry(idValue, input);
-    id = idValue;
-  } else {
-    id = createEntry(input);
-  }
-
-  revalidatePath("/", "layout");
-  redirect(`/entries/${id}`);
+  const keywords = await extractKeywords(article.title, article.bodyText || (article.description ?? ""), text);
+  const id = createNote(article.id, text, keywords);
+  revalidatePath("/archive");
+  return { ok: true, id };
 }
 
-export async function removeEntry(id: number): Promise<void> {
-  deleteEntry(id);
-  revalidatePath("/", "layout");
+export async function updateReflection(
+  id: number,
+  reflection: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const text = reflection.trim();
+  if (!text) return { ok: false, error: "느낀 점이 비어 있어요." };
+  const note = getNote(id);
+  if (!note) return { ok: false, error: "기록을 찾지 못했어요." };
+
+  const article = getArticle(note.article.id);
+  const keywords = await extractKeywords(
+    note.article.title,
+    article?.bodyText || (note.article.description ?? ""),
+    text,
+  );
+  updateNote(id, text, keywords);
+  revalidatePath("/archive");
+  revalidatePath(`/notes/${id}`);
+  return { ok: true };
+}
+
+export async function removeNote(id: number): Promise<void> {
+  deleteNote(id);
+  revalidatePath("/archive");
   redirect("/archive");
 }

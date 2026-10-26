@@ -19,11 +19,11 @@ export default function RootLayout({
             <Link href="/" className="mr-auto text-[17px] font-semibold tracking-tight">
               📚 Readlog
             </Link>
-            <Link href="/archive" className="btn btn-ghost text-sm">
-              아카이브
-            </Link>
-            <Link href="/entries/new" className="btn btn-primary">
+            <Link href="/" className="btn btn-ghost text-sm">
               기록하기
+            </Link>
+            <Link href="/archive" className="btn btn-ghost text-sm">
+              모아보기
             </Link>
           </nav>
         </header>

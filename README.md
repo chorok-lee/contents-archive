@@ -1,25 +1,27 @@
 # 📚 Readlog
 
-매일 읽은 아티클의 URL을 붙여넣고 느낀 점을 기록하는 개인 아카이브.
+읽은 글의 URL을 붙여넣고 느낀 점만 적으면 되는 개인 아카이브.
 
-- URL만 붙여넣으면 제목·썸네일·사이트·작성자·읽는 시간을 자동으로 채움 (실패하면 직접 입력)
-- 한 줄 요약, 느낀 점(마크다운), 인상 깊은 문장, 태그, 감정 기록
-- "읽을 예정" 목록, 날짜별 아카이브, 검색·태그·월 필터
-- 매일 기록 습관을 보여주는 잔디와 연속 기록 일수
+1. **등록** — 홈 입력창에 URL을 붙여넣으면 바로 본문을 읽고 3줄로 요약한다. 아래에 느낀 점을 쓰고 저장.
+2. **키워드** — 저장할 때 본문과 느낀 점을 보고 키워드(AI, 생산성, 시간관리, 조직문화, 디자인 등 12개 중 1~3개)를 자동으로 붙인다.
+3. **모아보기** — 최근 저장한 메모가 위에 오는 타임라인. 상단 키워드 칩으로 골라 본다. 느낀 점은 상세 화면에서 고치거나 지울 수 있다(고치면 키워드를 다시 뽑는다).
 
 ## 실행
 
 ```bash
 npm install
-npm run dev     # http://localhost:3000
+cp .env.example .env.local   # ANTHROPIC_API_KEY 입력 (선택)
+npm run dev                  # http://localhost:3000
 ```
 
-데이터는 `data/readlog.db`(SQLite)에 저장된다. 백업은 이 파일을 복사하면 된다. 다른 경로를 쓰려면 `READLOG_DB=/path/to/readlog.db`.
+- `ANTHROPIC_API_KEY`가 있으면 Claude(`claude-opus-5-5`)가 요약과 키워드를 만든다. 없거나 호출이 실패하면 글 설명·첫 문장들로 요약하고, 단어 사전으로 키워드를 고른다.
+- 같은 URL의 요약은 DB에 캐시돼 다시 붙여넣어도 API를 또 부르지 않는다.
+- 데이터는 `data/readlog.db`(SQLite) 한 파일. 다른 경로는 `READLOG_DB=/path/to/readlog.db`.
 
-> SQLite 파일 저장 방식이라 Vercel 같은 서버리스 환경에 배포하면 데이터가 유지되지 않는다. 배포가 필요해지면 Supabase(Postgres)로 옮긴다. `lib/entries.ts`만 바꾸면 되도록 저장 로직을 모아 두었다.
+> SQLite 파일 저장 방식이라 Vercel 같은 서버리스 환경에 배포하면 데이터가 유지되지 않는다. 배포가 필요해지면 `lib/notes.ts`를 Supabase(Postgres)로 옮긴다.
 
 ## 디자인
 
-`DESIGN.md`는 [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md)(MIT)의 Notion 스타일 파일을 그대로 가져온 것이다. 커뮤니티가 공개 CSS에서 추출한 근사치이며 공식 자료가 아니다. 토큰은 `app/globals.css`로 옮겼고, 한글 폰트는 Pretendard(Latin 글리프가 Inter 기반)를 쓴다.
+`DESIGN.md`는 [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md)(MIT)의 Notion 스타일 파일이다. 커뮤니티가 공개 CSS에서 추출한 근사치이며 공식 자료가 아니다. 토큰은 `app/globals.css`로 옮겼고, 폰트는 Pretendard.
 
 기획서와 디자인 시스템 후보는 [`docs/`](./docs)에 있다.

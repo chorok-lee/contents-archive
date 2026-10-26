@@ -1,147 +1,77 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { EntryCard } from "@/components/EntryCard";
-import { formatDateLabel, formatMonthLabel } from "@/lib/dates";
-import { listEntries, listMonths, listTags, type Entry, type EntryStatus } from "@/lib/entries";
+import { NoteCard } from "@/components/NoteCard";
+import { formatDateLabel, toDateKey } from "@/lib/dates";
+import { isKeyword } from "@/lib/keywords";
+import { keywordCounts, listNotes, type Note } from "@/lib/notes";
 
-export const metadata: Metadata = { title: "아카이브" };
+export const metadata: Metadata = { title: "모아보기" };
 export const dynamic = "force-dynamic";
-
-interface Filters {
-  q?: string;
-  tag?: string;
-  month?: string;
-  status?: EntryStatus;
-}
-
-function href(current: Filters, change: Partial<Filters>): string {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries({ ...current, ...change })) {
-    if (value) params.set(key, value);
-  }
-  const qs = params.toString();
-  return qs ? `/archive?${qs}` : "/archive";
-}
 
 export default async function ArchivePage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | undefined>>;
+  searchParams: Promise<{ k?: string }>;
 }) {
-  const raw = await searchParams;
-  const filters: Filters = {
-    q: raw.q?.trim() || undefined,
-    tag: raw.tag || undefined,
-    month: /^\d{4}-\d{2}$/.test(raw.month ?? "") ? raw.month : undefined,
-    status: raw.status === "read" || raw.status === "to_read" ? raw.status : undefined,
-  };
+  const { k } = await searchParams;
+  const active = isKeyword(k) ? k : undefined;
+  const notes = listNotes(active);
+  const chips = keywordCounts();
+  const total = chips.length ? listNotes().length : notes.length;
 
-  const entries = listEntries(filters);
-  const tags = listTags();
-  const months = listMonths();
-  const filtered = Boolean(filters.q || filters.tag || filters.month || filters.status);
-
-  const groups = new Map<string, Entry[]>();
-  for (const entry of entries) {
-    groups.set(entry.readOn, [...(groups.get(entry.readOn) ?? []), entry]);
+  const groups = new Map<string, Note[]>();
+  for (const note of notes) {
+    const day = toDateKey(new Date(note.createdAt));
+    groups.set(day, [...(groups.get(day) ?? []), note]);
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-[28px] font-semibold tracking-[-0.5px]">아카이브</h1>
+      <h1 className="text-[28px] font-semibold tracking-[-0.5px]">모아보기</h1>
 
-      <form action="/archive" role="search">
-        {filters.tag && <input type="hidden" name="tag" value={filters.tag} />}
-        {filters.month && <input type="hidden" name="month" value={filters.month} />}
-        {filters.status && <input type="hidden" name="status" value={filters.status} />}
-        <label htmlFor="archive-search" className="sr-only">
-          검색
-        </label>
-        <input
-          id="archive-search"
-          name="q"
-          type="search"
-          defaultValue={filters.q}
-          placeholder="🔍 제목, 요약, 느낀 점, 인용, 태그 검색"
-          className="input input-search"
-        />
-      </form>
-
-      <div className="flex flex-col gap-3">
-        <FilterRow>
-          {(
-            [
-              [undefined, "전체"],
-              ["read", "읽음"],
-              ["to_read", "읽을 예정"],
-            ] as const
-          ).map(([status, label]) => (
-            <Link key={label} href={href(filters, { status })} aria-current={filters.status === status} className="pill-tab">
-              {label}
-            </Link>
-          ))}
-          {months.length > 0 && <span className="mx-1 w-px self-stretch bg-hairline" aria-hidden />}
-          {months.map((month) => (
+      {chips.length > 0 && (
+        <nav
+          aria-label="키워드"
+          className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]"
+        >
+          <Link href="/archive" aria-current={!active} className="pill-tab">
+            전체 <span className="ml-1 opacity-60">{total}</span>
+          </Link>
+          {chips.map(({ keyword, count }) => (
             <Link
-              key={month}
-              href={href(filters, { month: filters.month === month ? undefined : month })}
-              aria-current={filters.month === month}
+              key={keyword}
+              href={`/archive?k=${encodeURIComponent(keyword)}`}
+              aria-current={active === keyword}
               className="pill-tab"
             >
-              {formatMonthLabel(month)}
+              {keyword} <span className="ml-1 opacity-60">{count}</span>
             </Link>
           ))}
-        </FilterRow>
-        {tags.length > 0 && (
-          <FilterRow>
-            {tags.map(({ name, count }) => (
-              <Link
-                key={name}
-                href={href(filters, { tag: filters.tag === name ? undefined : name })}
-                className={`tag-chip shrink-0 ${filters.tag === name ? "ring-2 ring-primary" : "hover:underline"}`}
-              >
-                #{name} <span className="font-normal opacity-60">{count}</span>
-              </Link>
-            ))}
-          </FilterRow>
-        )}
-      </div>
+        </nav>
+      )}
 
-      <div className="flex items-center justify-between text-sm text-steel">
-        <span>{entries.length}개의 기록</span>
-        {filtered && (
-          <Link href="/archive" className="font-medium text-link">
-            필터 초기화
+      {notes.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-hairline-strong px-6 py-12 text-center">
+          <p className="text-3xl">📝</p>
+          <p className="mt-3 font-medium">{active ? `#${active} 기록이 없어요` : "아직 기록이 없어요"}</p>
+          <Link href="/" className="btn btn-primary mt-5">
+            첫 기록 남기기
           </Link>
-        )}
-      </div>
-
-      {entries.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-hairline-strong px-6 py-12 text-center text-steel">
-          {filtered ? "조건에 맞는 기록이 없어요." : "아직 기록이 없어요."}
-        </p>
+        </div>
       ) : (
         <div className="flex flex-col gap-8">
-          {[...groups].map(([day, dayEntries]) => (
+          {[...groups].map(([day, dayNotes]) => (
             <section key={day}>
               <h2 className="mb-3 text-sm font-semibold text-slate">{formatDateLabel(day)}</h2>
               <div className="flex flex-col gap-3">
-                {dayEntries.map((entry) => (
-                  <EntryCard key={entry.id} entry={entry} />
+                {dayNotes.map((note) => (
+                  <NoteCard key={note.id} note={note} />
                 ))}
               </div>
             </section>
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function FilterRow({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
-      {children}
     </div>
   );
 }
