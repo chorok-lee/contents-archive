@@ -96,7 +96,7 @@ export async function saveNote(
 
     const keywords = await extractKeywords(article.title, article.bodyText || (article.description ?? ""), text);
     const id = await createNote(article.id, text, keywords);
-    revalidatePath("/archive");
+    revalidatePath("/");
     return { ok: true, id };
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
@@ -120,7 +120,7 @@ export async function updateReflection(
       text,
     );
     await updateNote(id, text, keywords);
-    revalidatePath("/archive");
+    revalidatePath("/");
     revalidatePath(`/notes/${id}`);
     return { ok: true };
   } catch (error) {
@@ -130,6 +130,6 @@ export async function updateReflection(
 
 export async function removeNote(id: number): Promise<void> {
   await deleteNote(id);
-  revalidatePath("/archive");
-  redirect("/archive");
+  revalidatePath("/");
+  redirect("/");
 }

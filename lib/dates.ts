@@ -1,23 +1,29 @@
-/** Local calendar date as YYYY-MM-DD. */
-export function toDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+// Dates render on the server (UTC on Vercel), so format in the reader's zone explicitly.
+const TIME_ZONE = process.env.READLOG_TZ ?? "Asia/Seoul";
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }); // YYYY-MM-DD
+const longDate = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: TIME_ZONE,
+  month: "long",
+  day: "numeric",
+  weekday: "long",
+});
+const longDateWithYear = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: TIME_ZONE,
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  weekday: "long",
+});
 
-/** "오늘", "어제", or "2026년 10월 24일 (토)" for a local date key. */
-export function formatDateLabel(key: string): string {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (key === toDateKey(today)) return "오늘";
-  if (key === toDateKey(yesterday)) return "어제";
-
-  const [y, m, d] = key.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  const sameYear = y === today.getFullYear();
-  return `${sameYear ? "" : `${y}년 `}${m}월 ${d}일 (${WEEKDAYS[date.getDay()]})`;
+/** "오늘", "어제", "11월 3일 월요일", or with the year when it isn't this year. */
+export function formatNoteDate(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const key = dayKey.format(date);
+  if (key === dayKey.format(now)) return "오늘";
+  if (key === dayKey.format(new Date(now.getTime() - 86_400_000))) return "어제";
+  return key.slice(0, 4) === dayKey.format(now).slice(0, 4)
+    ? longDate.format(date)
+    : longDateWithYear.format(date);
 }
