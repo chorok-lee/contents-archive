@@ -43,9 +43,11 @@ async function loadArticle(url: string): Promise<{ article: Article; failure: Fe
 
   const fetched = await fetchArticle(url);
   if (typeof fetched === "string") {
-    const article =
-      cached ??
-      (await saveArticle({
+    // A temporary failure keeps the earlier copy; a login wall means that copy wasn't the article.
+    const keepCached = cached && fetched !== "login";
+    const article = keepCached
+      ? cached
+      : await saveArticle({
         url,
         title: new URL(url).hostname.replace(/^www\./, ""),
         siteName: null,
@@ -54,7 +56,7 @@ async function loadArticle(url: string): Promise<{ article: Article; failure: Fe
         bodyText: "",
         summary: [],
         summarizedBy: "rule",
-      }));
+      });
     return { article, failure: fetched };
   }
 
