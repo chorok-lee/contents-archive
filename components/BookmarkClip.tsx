@@ -12,8 +12,10 @@ export interface Bookmark {
 }
 
 /** The article attached to a note, shown under the editor. Tap to show the 3-line summary. */
-export function BookmarkClip({ bookmark }: { bookmark: Bookmark }) {
-  const [open, setOpen] = useState(false);
+export function BookmarkClip({ bookmark, compact = false }: { bookmark: Bookmark; compact?: boolean }) {
+  const [expanded, setOpen] = useState(false);
+  // While typing (keyboard up) the clip stays one line so the text keeps its room.
+  const open = expanded && !compact;
   const hasSummary = bookmark.summary.length > 0;
 
   return (

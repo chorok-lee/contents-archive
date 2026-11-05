@@ -51,9 +51,10 @@ export async function getArticle(id: number) {
 }
 
 export async function saveArticle(input: Omit<Article, "id">): Promise<Article> {
+  const fetchedAt = new Date().toISOString();
   const existing = db.articles.find((a) => a.url === input.url);
-  if (existing) return Object.assign(existing, input);
-  const article = { ...input, id: ++db.seq };
+  if (existing) return Object.assign(existing, input, { fetchedAt });
+  const article = { ...input, fetchedAt, id: ++db.seq };
   db.articles.push(article);
   return article;
 }

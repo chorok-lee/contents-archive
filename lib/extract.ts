@@ -4,6 +4,14 @@ import { parseHTML } from "linkedom";
 const TRACKING_PARAMS = /^(utm_|fbclid$|gclid$|igshid$|mc_|ref$|ref_src$)/;
 const MAX_HTML_BYTES = 5_000_000;
 
+// Some Korean blog platforms reject requests that don't look like a real browser.
+const BROWSER_HEADERS = {
+  "user-agent":
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+  accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "accept-language": "ko-KR,ko;q=0.9,en;q=0.8",
+};
+
 /** Adds a scheme if missing, drops tracking params and the hash. Returns null if not an http(s) URL. */
 export function normalizeUrl(raw: string): string | null {
   const trimmed = raw.trim();
@@ -66,30 +74,72 @@ function decode(bytes: ArrayBuffer, contentType: string | null): string {
   }
 }
 
-/** Fetches a page and pulls out its Open Graph info and readable body text. */
-export async function fetchArticle(url: string): Promise<FetchedArticle | null> {
-  let html: string;
-  let finalUrl = url;
+const MAX_REDIRECTS = 5;
+const LOGIN_PATH = /\/(auth|login|signin|oauth)\b/i;
+const LOGIN_HOST = /^(kauth\.kakao\.com|nid\.naver\.com|accounts\.google\.com)$/i;
+
+export type FetchFailure = "login" | "unavailable";
+
+/** Follows redirects by hand so a detour through a login page is reported instead of followed. */
+async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string } | FetchFailure> {
+  const host = new URL(url).hostname;
+  let current = url;
   try {
-    const res = await fetch(url, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(10_000),
-      headers: {
-        "user-agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
-        "accept-language": "ko,en;q=0.8",
-        accept: "text/html,application/xhtml+xml",
-      },
-    });
-    if (!res.ok) return null;
-    if (!(res.headers.get("content-type") ?? "text/html").includes("html")) return null;
-    const bytes = await res.arrayBuffer();
-    if (bytes.byteLength > MAX_HTML_BYTES) return null;
-    html = decode(bytes, res.headers.get("content-type"));
-    finalUrl = res.url || url;
-  } catch {
-    return null;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      const res = await fetch(current, {
+        redirect: "manual",
+        signal: AbortSignal.timeout(10_000),
+        headers: BROWSER_HEADERS,
+      });
+      const location = res.headers.get("location");
+      if (res.status >= 300 && res.status < 400 && location) {
+        const next = new URL(location, current);
+        if (LOGIN_HOST.test(next.hostname) || LOGIN_PATH.test(next.pathname)) {
+          console.warn(`[readlog] fetch ${host} redirects to login ${next.hostname}${next.pathname}`);
+          return "login";
+        }
+        current = next.toString();
+        continue;
+      }
+      const type = res.headers.get("content-type") ?? "text/html";
+      if (!res.ok || !type.includes("html")) {
+        console.warn(`[readlog] fetch ${host} status=${res.status} type=${type}`);
+        return "unavailable";
+      }
+      const bytes = await res.arrayBuffer();
+      if (bytes.byteLength > MAX_HTML_BYTES) {
+        console.warn(`[readlog] fetch ${host} too large bytes=${bytes.byteLength}`);
+        return "unavailable";
+      }
+      return { html: decode(bytes, type), finalUrl: current };
+    }
+    console.warn(`[readlog] fetch ${host} too many redirects`);
+    return "unavailable";
+  } catch (error) {
+    const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    console.warn(`[readlog] fetch ${host} failed ${reason}`);
+    return "unavailable";
   }
+}
+
+/** Plain text of an HTML fragment with one line per paragraph-like block. */
+function blockText(html: string): string {
+  const spaced = html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|h[1-6]|li|blockquote|section|article|figcaption|pre|tr)>/gi, "$&\n");
+  const { document } = parseHTML(`<!doctype html><html><body>${spaced}</body></html>`);
+  return (document.body?.textContent ?? "")
+    .replace(/[ \t\u00a0]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
+/** Fetches a page and pulls out its Open Graph info and readable body text. */
+export async function fetchArticle(url: string): Promise<FetchedArticle | FetchFailure> {
+  const fetched = await fetchHtml(url);
+  if (typeof fetched === "string") return fetched;
+  const { html, finalUrl } = fetched;
 
   const { document } = parseHTML(html);
   const meta = (selector: string) =>
@@ -111,7 +161,7 @@ export async function fetchArticle(url: string): Promise<FetchedArticle | null> 
   let bodyText = "";
   try {
     const parsed = new Readability(document as unknown as Document).parse();
-    bodyText = (parsed?.textContent ?? "").replace(/[ \t]+/g, " ").replace(/\n\s*\n+/g, "\n").trim();
+    bodyText = parsed?.content ? blockText(parsed.content) : "";
   } catch {
     bodyText = "";
   }

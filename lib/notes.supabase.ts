@@ -11,6 +11,8 @@ export interface Article {
   bodyText: string;
   summary: string[];
   summarizedBy: "ai" | "rule";
+  /** When the page was last fetched; set by the store. */
+  fetchedAt?: string;
 }
 
 export interface Note {
@@ -32,6 +34,7 @@ interface ArticleRow {
   body_text: string;
   summary: string[];
   summarized_by: "ai" | "rule";
+  fetched_at?: string;
 }
 
 interface NoteRow {
@@ -71,6 +74,7 @@ function toArticle(row: ArticleRow): Article {
     bodyText: row.body_text,
     summary: row.summary ?? [],
     summarizedBy: row.summarized_by,
+    fetchedAt: row.fetched_at,
   };
 }
 

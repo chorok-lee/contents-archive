@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { extractKeywords, summarize } from "@/lib/ai";
-import { fetchArticle, normalizeUrl } from "@/lib/extract";
+import { aiAvailable, extractKeywords, summarize } from "@/lib/ai";
+import { fetchArticle, normalizeUrl, type FetchFailure } from "@/lib/extract";
 import {
   createNote,
   deleteNote,
@@ -21,18 +21,29 @@ export type AnalyzeResult =
       ok: true;
       article: Pick<Article, "id" | "url" | "title" | "siteName" | "image">;
       summary: string[];
-      fetchFailed: boolean;
+      /** Why the page couldn't be read, if it couldn't. */
+      failure: FetchFailure | null;
       existingNoteId: number | null;
     }
   | { ok: false; error: string };
 
-async function loadArticle(url: string): Promise<{ article: Article; fetchFailed: boolean }> {
+// Pages fetched before the extractor last changed are fetched again.
+const EXTRACTOR_UPDATED_AT = "2026-11-05T00:00:00Z";
+
+function isFresh(article: Article): boolean {
+  if (!article.bodyText) return false;
+  if (!article.fetchedAt || article.fetchedAt < EXTRACTOR_UPDATED_AT) return false;
+  // A rule-based summary is redone once an API key is configured.
+  return article.summarizedBy === "ai" || !aiAvailable();
+}
+
+async function loadArticle(url: string): Promise<{ article: Article; failure: FetchFailure | null }> {
   const cached = await getArticleByUrl(url);
-  if (cached?.bodyText) return { article: cached, fetchFailed: false };
+  if (cached && isFresh(cached)) return { article: cached, failure: null };
 
   const fetched = await fetchArticle(url);
-  if (!fetched) {
-    const fallback =
+  if (typeof fetched === "string") {
+    const article =
       cached ??
       (await saveArticle({
         url,
@@ -44,12 +55,13 @@ async function loadArticle(url: string): Promise<{ article: Article; fetchFailed
         summary: [],
         summarizedBy: "rule",
       }));
-    return { article: fallback, fetchFailed: true };
+    return { article, failure: fetched };
   }
 
   const { lines, by } = await summarize(fetched.title, fetched.description, fetched.bodyText);
+  console.info(`[readlog] analyze ${new URL(url).hostname} bodyChars=${fetched.bodyText.length} by=${by}`);
   const article = await saveArticle({ ...fetched, summary: lines, summarizedBy: by });
-  return { article, fetchFailed: false };
+  return { article, failure: null };
 }
 
 function errorMessage(error: unknown): string {
@@ -68,7 +80,7 @@ export async function analyzeUrl(raw: string): Promise<AnalyzeResult> {
 }
 
 async function analyze(url: string): Promise<AnalyzeResult> {
-  const { article, fetchFailed } = await loadArticle(url);
+  const { article, failure } = await loadArticle(url);
   return {
     ok: true,
     article: {
@@ -79,7 +91,7 @@ async function analyze(url: string): Promise<AnalyzeResult> {
       image: article.image,
     },
     summary: article.summary,
-    fetchFailed,
+    failure,
     existingNoteId: await findNoteIdByUrl(url),
   };
 }

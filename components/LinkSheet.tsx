@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition, type ClipboardEvent, type FormEvent } from "react";
 import { analyzeUrl, type AnalyzeResult } from "@/app/actions";
+import { useVisualViewport, viewportStyle } from "@/lib/useVisualViewport";
 import { ChevronLeft, Close, LinkIcon } from "./icons";
 
 export type Analyzed = Extract<AnalyzeResult, { ok: true }>;
@@ -12,13 +13,19 @@ interface Props {
   prefill: string;
   /** Result kept from an earlier visit (coming back from the editor) — reopens on the summary step. */
   initial: Analyzed | null;
+  /** Step to open on: 2 skips straight to the summary (used by the clipboard toast). */
+  startStep?: 1 | 2;
+  /** Hint shown on the link step, e.g. when the clipboard had no link. */
+  notice?: string;
   onCancel: () => void;
   onAttach: (result: Analyzed) => void;
 }
 
 /** Two-step sheet: 1) paste the link, 2) check the 3-line summary, then attach it as a bookmark. */
-export function LinkSheet({ prefill, initial, onCancel, onAttach }: Props) {
-  const [step, setStep] = useState<1 | 2>(initial ? 2 : 1);
+export function LinkSheet({ prefill, initial, startStep = 1, notice, onCancel, onAttach }: Props) {
+  const [step, setStep] = useState<1 | 2>(initial ? 2 : startStep);
+  const viewport = useVisualViewport();
+  const compact = viewport?.keyboardOpen ?? false;
   const [url, setUrl] = useState(initial?.article.url ?? "");
   const [result, setResult] = useState<Analyzed | null>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +87,7 @@ export function LinkSheet({ prefill, initial, onCancel, onAttach }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-end justify-center">
+    <div className="fixed inset-0 z-30 flex items-end justify-center" style={viewportStyle(viewport)}>
       <button
         type="button"
         aria-label="닫기"
@@ -91,7 +98,7 @@ export function LinkSheet({ prefill, initial, onCancel, onAttach }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="link-sheet-title"
-        className="animate-sheet-up relative flex max-h-[94dvh] w-full max-w-lg flex-col overflow-y-auto rounded-t-2xl bg-canvas px-5 pt-2 pb-[max(20px,env(safe-area-inset-bottom))]"
+        className={`animate-sheet-up relative flex max-h-[calc(100%-8px)] w-full max-w-lg flex-col overflow-y-auto rounded-t-2xl bg-canvas px-5 pt-2 ${compact ? "pb-3" : "pb-[max(20px,env(safe-area-inset-bottom))]"}`}
       >
         <span aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-hairline" />
         <div className="relative mt-2 flex h-10 items-center justify-center">
@@ -108,15 +115,21 @@ export function LinkSheet({ prefill, initial, onCancel, onAttach }: Props) {
 
         {step === 1 ? (
           <form key="step-1" onSubmit={next} className="animate-slide-in flex flex-col">
-            <h2 id="link-sheet-title" className="mt-6 text-center text-[32px] leading-tight font-bold tracking-tight">
+            <h2
+              id="link-sheet-title"
+              className={`text-center leading-tight font-bold tracking-tight ${compact ? "mt-1 text-[22px]" : "mt-6 text-[32px]"}`}
+            >
               링크 붙이기
             </h2>
-            <p className="mt-2 text-center text-[17px] text-steel">오늘 읽은 글의 URL을 붙여넣어 주세요</p>
+            {!compact && <p className="mt-2 text-center text-[17px] text-steel">오늘 읽은 글의 URL을 붙여넣어 주세요</p>}
+            {notice && <p className="mt-3 rounded-md bg-surface px-4 py-2.5 text-center text-[15px] text-slate">{notice}</p>}
 
-            <div className="my-8 flex justify-center">
+            <div className={compact ? "h-4" : "my-8 flex justify-center"}>
+              {!compact && (
               <span className="flex size-28 items-center justify-center rounded-2xl bg-tint text-primary">
                 <LinkIcon size={44} />
               </span>
+              )}
             </div>
 
             <div className="relative">
@@ -255,9 +268,11 @@ function Summary({ result, analyzing }: { result: Analyzed | null; analyzing: bo
           </ol>
         ) : (
           <p className="mt-2 text-[15px] text-steel">
-            {result.fetchFailed
-              ? "글을 불러오지 못해 요약이 없어요. 그래도 느낀 점은 남길 수 있어요."
-              : "요약할 본문을 찾지 못했어요. 그래도 느낀 점은 남길 수 있어요."}
+            {result.failure === "login"
+              ? "이 사이트는 로그인 화면으로 넘어가서 본문을 읽지 못했어요. 그래도 느낀 점은 남길 수 있어요."
+              : result.failure
+                ? "글을 불러오지 못해 요약이 없어요. 그래도 느낀 점은 남길 수 있어요."
+                : "요약할 본문을 찾지 못했어요. 그래도 느낀 점은 남길 수 있어요."}
           </p>
         )}
       </div>

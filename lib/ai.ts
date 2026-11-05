@@ -9,8 +9,12 @@ const MAX_BODY_CHARS = 60_000;
 
 let client: Anthropic | null = null;
 
+export function aiAvailable(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
+}
+
 function getClient(): Anthropic | null {
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) return null;
+  if (!aiAvailable()) return null;
   client ??= new Anthropic();
   return client;
 }
@@ -54,20 +58,50 @@ const SummarySchema = z.object({ lines: z.array(z.string()) });
 function sentences(text: string): string[] {
   return (text.match(/[^.!?。\n]+[.!?。]?/g) ?? [])
     .map((s) => s.replace(/\s+/g, " ").trim())
-    .filter((s) => s.length >= 15 && s.length <= 200);
+    .filter((s) => s.length >= 20 && s.length <= 180);
 }
 
+// Bylines, dates, share/subscribe prompts and similar lines that aren't the article.
+const NOISE = /(구독|좋아요|댓글|공유하기|저작권|무단|All rights|Copyright|\d{4}[.\-/]\s?\d{1,2}[.\-/]\s?\d{1,2}|^\s*(by|글|사진)\s)/i;
+
+/** Rough stem: Korean words lose a trailing particle-length syllable, others are lowercased. */
+function stems(sentence: string): string[] {
+  return (sentence.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [])
+    .filter((w) => w.length >= 2)
+    .map((w) => (/[\uac00-\ud7a3]/.test(w) && w.length >= 3 ? w.slice(0, -1) : w));
+}
+
+function overlaps(a: string, b: string): boolean {
+  const sa = new Set(stems(a));
+  const sb = stems(b);
+  if (!sb.length) return false;
+  return sb.filter((w) => sa.has(w)).length / sb.length > 0.6;
+}
+
+/**
+ * Summary without an API key: the three sentences whose words recur most across the
+ * article (a classic frequency summary), kept in reading order.
+ */
 export function ruleSummary(description: string | null, body: string): string[] {
-  const seen = new Set<string>();
-  const lines: string[] = [];
-  for (const s of [...sentences(description ?? ""), ...sentences(body.slice(0, 5000))]) {
-    const key = s.slice(0, 30);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    lines.push(s);
-    if (lines.length === 3) break;
+  const candidates = sentences(body.slice(0, 20_000)).filter((s) => !NOISE.test(s));
+  const freq = new Map<string, number>();
+  for (const s of candidates) for (const w of new Set(stems(s))) freq.set(w, (freq.get(w) ?? 0) + 1);
+
+  const scored = candidates.map((s, i) => {
+    const words = stems(s);
+    const score = words.reduce((sum, w) => sum + ((freq.get(w) ?? 1) - 1), 0) / Math.sqrt(words.length || 1);
+    return { s, i, score };
+  });
+
+  const picked: { s: string; i: number }[] = [];
+  const intro = sentences(description ?? "").find((d) => !NOISE.test(d));
+  if (intro) picked.push({ s: intro, i: -1 });
+  for (const c of [...scored].sort((a, b) => b.score - a.score)) {
+    if (picked.length === 3) break;
+    if (picked.some((p) => overlaps(p.s, c.s) || overlaps(c.s, p.s))) continue;
+    picked.push(c);
   }
-  return lines;
+  return picked.sort((a, b) => a.i - b.i).map((p) => p.s);
 }
 
 export async function summarize(

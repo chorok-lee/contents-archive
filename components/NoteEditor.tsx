@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useVisualViewport, viewportStyle } from "@/lib/useVisualViewport";
 import { BookmarkClip, type Bookmark } from "./BookmarkClip";
 import { Check, ChevronLeft, Trash } from "./icons";
 
@@ -18,6 +19,8 @@ export function NoteEditor({ bookmark, initialText = "", onSave, onClose, onDele
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const dirty = text.trim() !== initialText.trim();
+  const viewport = useVisualViewport();
+  const keyboardOpen = viewport?.keyboardOpen ?? false;
 
   function close() {
     if (dirty && !confirm("작성 중인 내용이 사라져요. 닫을까요?")) return;
@@ -37,8 +40,8 @@ export function NoteEditor({ bookmark, initialText = "", onSave, onClose, onDele
   }
 
   return (
-    <div className="animate-slide-in fixed inset-0 z-40 flex flex-col bg-canvas">
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-[max(12px,env(safe-area-inset-top))]">
+    <div className="animate-slide-in fixed inset-0 z-40 flex flex-col bg-canvas" style={viewportStyle(viewport)}>
+      <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-4 pt-[max(12px,env(safe-area-inset-top))]">
         <div className="flex items-center gap-3 py-2">
           <button type="button" onClick={close} aria-label="뒤로" className="glass-btn mr-auto">
             <ChevronLeft size={24} />
@@ -77,11 +80,11 @@ export function NoteEditor({ bookmark, initialText = "", onSave, onClose, onDele
           }}
           autoFocus
           placeholder="무엇이 남았나요?"
-          className="mt-4 w-full flex-1 resize-none bg-transparent px-1 text-[19px] leading-relaxed outline-none placeholder:text-stone"
+          className="mt-4 min-h-0 w-full flex-1 resize-none bg-transparent px-1 text-[19px] leading-relaxed outline-none placeholder:text-stone"
         />
 
-        <div className="sticky bottom-0 pt-3 pb-[max(16px,env(safe-area-inset-bottom))]">
-          <BookmarkClip bookmark={bookmark} />
+        <div className={`pt-3 ${keyboardOpen ? "pb-2" : "pb-[max(16px,env(safe-area-inset-bottom))]"}`}>
+          <BookmarkClip bookmark={bookmark} compact={keyboardOpen} />
         </div>
       </div>
     </div>

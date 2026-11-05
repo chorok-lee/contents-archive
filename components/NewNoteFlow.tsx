@@ -3,15 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { saveNote } from "@/app/actions";
+import { ClipboardToast, looksLikeUrl } from "./ClipboardToast";
 import { Plus } from "./icons";
 import { LinkSheet, type Analyzed } from "./LinkSheet";
 import { NoteEditor } from "./NoteEditor";
 
 type Stage = "closed" | "sheet" | "editor";
-
-function looksLikeUrl(text: string): boolean {
-  return /^(https?:\/\/)?[\w-]+(\.[\w-]+)+(:\d+)?([/?#]\S*)?$/i.test(text);
-}
 
 /** ＋ button → link sheet (prefilled from the clipboard) → reflection editor with the bookmark attached. */
 export function NewNoteFlow() {
@@ -19,14 +16,27 @@ export function NewNoteFlow() {
   const [stage, setStage] = useState<Stage>("closed");
   const [prefill, setPrefill] = useState("");
   const [result, setResult] = useState<Analyzed | null>(null);
+  const [startStep, setStartStep] = useState<1 | 2>(1);
+  const [notice, setNotice] = useState<string | undefined>();
 
   useEffect(() => {
     document.body.style.overflow = stage === "closed" ? "" : "hidden";
   }, [stage]);
 
+  /** From the clipboard toast: a link skips straight to the summary step. */
+  function openFromToast(url: string | null) {
+    setResult(null);
+    setPrefill(url ?? "");
+    setStartStep(url ? 2 : 1);
+    setNotice(url ? undefined : "클립보드에 링크가 없어요. 직접 붙여넣어 주세요.");
+    setStage("sheet");
+  }
+
   function open() {
     setPrefill("");
     setResult(null);
+    setStartStep(1);
+    setNotice(undefined);
     setStage("sheet");
     // Must run inside the tap: browsers only allow clipboard reads on a user gesture
     // (iOS Safari shows its own "Paste" confirmation).
@@ -64,10 +74,14 @@ export function NewNoteFlow() {
         <Plus size={30} />
       </button>
 
+      <ClipboardToast suppressed={stage !== "closed"} onAccept={openFromToast} />
+
       {stage === "sheet" && (
         <LinkSheet
           prefill={prefill}
           initial={result}
+          startStep={startStep}
+          notice={notice}
           onCancel={close}
           onAttach={(r) => {
             setResult(r);
