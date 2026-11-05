@@ -3,20 +3,22 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition, type ClipboardEvent, type FormEvent } from "react";
 import { analyzeUrl, type AnalyzeResult } from "@/app/actions";
-import { Close, LinkIcon } from "./icons";
+import { ChevronLeft, Close, LinkIcon } from "./icons";
 
 export type Analyzed = Extract<AnalyzeResult, { ok: true }>;
 
 interface Props {
-  /** URL found on the clipboard when the sheet opened; analyzed right away. */
+  /** URL found on the clipboard when the sheet opened; analysis starts right away in the background. */
   prefill: string;
-  /** Result kept from an earlier visit (coming back from the editor). */
+  /** Result kept from an earlier visit (coming back from the editor) — reopens on the summary step. */
   initial: Analyzed | null;
   onCancel: () => void;
   onAttach: (result: Analyzed) => void;
 }
 
+/** Two-step sheet: 1) paste the link, 2) check the 3-line summary, then attach it as a bookmark. */
 export function LinkSheet({ prefill, initial, onCancel, onAttach }: Props) {
+  const [step, setStep] = useState<1 | 2>(initial ? 2 : 1);
   const [url, setUrl] = useState(initial?.article.url ?? "");
   const [result, setResult] = useState<Analyzed | null>(initial);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +35,12 @@ export function LinkSheet({ prefill, initial, onCancel, onAttach }: Props) {
     startAnalyze(async () => {
       const res = await analyzeUrl(target);
       if (request !== requestRef.current) return; // a newer URL replaced this one
-      if (res.ok) setResult(res);
-      else setError(res.error);
+      if (res.ok) {
+        setResult(res);
+      } else {
+        setError(res.error);
+        setStep(1); // errors are fixed on the link step
+      }
     });
   }
 
@@ -59,10 +65,10 @@ export function LinkSheet({ prefill, initial, onCancel, onAttach }: Props) {
     analyze(pasted);
   }
 
-  function onSubmit(e: FormEvent) {
+  function next(e: FormEvent) {
     e.preventDefault();
-    if (result) onAttach(result);
-    else analyze(url);
+    if (!result && !analyzing) analyze(url);
+    setStep(2);
   }
 
   function clear() {
@@ -81,109 +87,147 @@ export function LinkSheet({ prefill, initial, onCancel, onAttach }: Props) {
         onClick={onCancel}
         className="animate-fade-in absolute inset-0 bg-black/30"
       />
-      <form
-        onSubmit={onSubmit}
+      <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="link-sheet-title"
         className="animate-sheet-up relative flex max-h-[94dvh] w-full max-w-lg flex-col overflow-y-auto rounded-t-2xl bg-canvas px-5 pt-2 pb-[max(20px,env(safe-area-inset-bottom))]"
       >
-        <span aria-hidden className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-hairline" />
-        <button type="button" onClick={onCancel} aria-label="닫기" className="glass-btn absolute top-3 right-4 size-10">
-          <Close size={18} />
-        </button>
-
-        <h2 id="link-sheet-title" className="mt-8 text-center text-[32px] leading-tight font-bold tracking-tight">
-          링크 붙이기
-        </h2>
-        <p className="mt-2 text-center text-[17px] text-steel">
-          읽은 글의 URL을 붙여넣으면
-          <br />
-          3줄로 요약해 드려요
-        </p>
-
-        <div className="my-6">
-          <Preview result={result} analyzing={analyzing} error={error} />
-        </div>
-
-        {result?.existingNoteId && (
-          <p className="mb-3 text-center text-[15px] text-steel">
-            이미 기록한 글이에요 ·{" "}
-            <Link href={`/notes/${result.existingNoteId}`} className="font-medium text-link">
-              이전 기록 보기
-            </Link>
-          </p>
-        )}
-
-        <div className="relative">
-          <label htmlFor="url-input" className="sr-only">
-            아티클 URL
-          </label>
-          <span aria-hidden className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-steel">
-            <LinkIcon size={20} />
-          </span>
-          <input
-            id="url-input"
-            ref={inputRef}
-            value={url}
-            onChange={(e) => {
-              setUrl(e.target.value);
-              if (result) setResult(null);
-            }}
-            onPaste={onPaste}
-            type="text"
-            inputMode="url"
-            enterKeyHint="go"
-            autoComplete="off"
-            autoFocus={!prefill && !initial}
-            placeholder="https://"
-            className="input px-12"
-          />
-          {url && (
-            <button
-              type="button"
-              onClick={clear}
-              aria-label="입력 지우기"
-              className="absolute top-1/2 right-4 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-stone text-canvas"
-            >
-              <Close size={13} strokeWidth={3} />
+        <span aria-hidden className="mx-auto h-1.5 w-10 rounded-full bg-hairline" />
+        <div className="relative mt-2 flex h-10 items-center justify-center">
+          {step === 2 && (
+            <button type="button" onClick={() => setStep(1)} aria-label="링크 다시 입력" className="glass-btn absolute left-0 size-10">
+              <ChevronLeft size={20} />
             </button>
           )}
+          <StepDots step={step} />
+          <button type="button" onClick={onCancel} aria-label="닫기" className="glass-btn absolute right-0 size-10">
+            <Close size={18} />
+          </button>
         </div>
 
-        <button type="submit" disabled={analyzing || !url.trim()} className="btn btn-dark mt-3 w-full">
-          {analyzing ? "글을 읽는 중…" : result ? "북마크 붙이기" : "불러오기"}
-        </button>
-      </form>
+        {step === 1 ? (
+          <form key="step-1" onSubmit={next} className="animate-slide-in flex flex-col">
+            <h2 id="link-sheet-title" className="mt-6 text-center text-[32px] leading-tight font-bold tracking-tight">
+              링크 붙이기
+            </h2>
+            <p className="mt-2 text-center text-[17px] text-steel">오늘 읽은 글의 URL을 붙여넣어 주세요</p>
+
+            <div className="my-8 flex justify-center">
+              <span className="flex size-28 items-center justify-center rounded-2xl bg-tint text-primary">
+                <LinkIcon size={44} />
+              </span>
+            </div>
+
+            <div className="relative">
+              <label htmlFor="url-input" className="sr-only">
+                아티클 URL
+              </label>
+              <span aria-hidden className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-steel">
+                <LinkIcon size={20} />
+              </span>
+              <input
+                id="url-input"
+                ref={inputRef}
+                value={url}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  if (result || error) {
+                    requestRef.current++;
+                    setResult(null);
+                    setError(null);
+                  }
+                }}
+                onPaste={onPaste}
+                type="text"
+                inputMode="url"
+                enterKeyHint="next"
+                autoComplete="off"
+                autoFocus={!prefill}
+                placeholder="https://"
+                aria-invalid={!!error}
+                aria-describedby={error ? "url-error" : undefined}
+                className="input px-12"
+              />
+              {url && (
+                <button
+                  type="button"
+                  onClick={clear}
+                  aria-label="입력 지우기"
+                  className="absolute top-1/2 right-4 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-stone text-canvas"
+                >
+                  <Close size={13} strokeWidth={3} />
+                </button>
+              )}
+            </div>
+            {error && (
+              <p id="url-error" role="alert" className="mt-2 px-1 text-[15px] text-error">
+                {error}
+              </p>
+            )}
+
+            <button type="submit" disabled={!url.trim()} className="btn btn-dark mt-4 w-full">
+              다음
+            </button>
+          </form>
+        ) : (
+          <div key="step-2" className="animate-slide-in flex flex-col">
+            <h2 id="link-sheet-title" className="mt-6 text-center text-[32px] leading-tight font-bold tracking-tight">
+              3줄 요약
+            </h2>
+            <p className="mt-2 text-center text-[17px] text-steel">
+              {analyzing ? "글을 읽고 있어요…" : "이 글을 북마크로 붙일게요"}
+            </p>
+
+            <div className="my-6">
+              <Summary result={result} analyzing={analyzing} />
+            </div>
+
+            {result?.existingNoteId && (
+              <p className="mb-3 text-center text-[15px] text-steel">
+                이미 기록한 글이에요 ·{" "}
+                <Link href={`/notes/${result.existingNoteId}`} className="font-medium text-link">
+                  이전 기록 보기
+                </Link>
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => result && onAttach(result)}
+              disabled={analyzing || !result}
+              className="btn btn-dark w-full"
+            >
+              {analyzing ? "요약하는 중…" : "북마크 붙이기"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function Preview({ result, analyzing, error }: { result: Analyzed | null; analyzing: boolean; error: string | null }) {
-  if (analyzing) {
+function StepDots({ step }: { step: 1 | 2 }) {
+  return (
+    <div className="flex gap-1.5" aria-label={`2단계 중 ${step}단계`}>
+      {[1, 2].map((n) => (
+        <span
+          key={n}
+          className={`h-2 rounded-full transition-all ${n === step ? "w-5 bg-ink" : "w-2 bg-hairline"}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Summary({ result, analyzing }: { result: Analyzed | null; analyzing: boolean }) {
+  if (analyzing || !result) {
     return (
       <div aria-busy="true" aria-label="글을 읽고 요약하는 중" className="rounded-xl bg-surface p-4">
         <div className="h-32 animate-pulse rounded-lg bg-fill" />
         {[70, 92, 80].map((w) => (
           <div key={w} className="mt-3 h-3.5 animate-pulse rounded-full bg-fill" style={{ width: `${w}%` }} />
         ))}
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <p role="alert" className="rounded-xl bg-tint-peach px-5 py-6 text-center text-[15px] text-charcoal">
-        {error}
-      </p>
-    );
-  }
-
-  if (!result) {
-    return (
-      <div className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-hairline px-5 py-10 text-steel">
-        <LinkIcon size={28} />
-        <p className="text-[15px]">미리보기가 여기에 나와요</p>
       </div>
     );
   }
@@ -211,7 +255,9 @@ function Preview({ result, analyzing, error }: { result: Analyzed | null; analyz
           </ol>
         ) : (
           <p className="mt-2 text-[15px] text-steel">
-            {result.fetchFailed ? "글을 불러오지 못했어요. 그래도 느낀 점은 남길 수 있어요." : "요약할 본문을 찾지 못했어요."}
+            {result.fetchFailed
+              ? "글을 불러오지 못해 요약이 없어요. 그래도 느낀 점은 남길 수 있어요."
+              : "요약할 본문을 찾지 못했어요. 그래도 느낀 점은 남길 수 있어요."}
           </p>
         )}
       </div>
