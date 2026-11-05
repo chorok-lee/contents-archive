@@ -33,9 +33,14 @@ npm run dev
 http://localhost:3000 에서 URL을 붙여넣고 저장한 뒤, Supabase **Table Editor**의 `notes`에 행이 생겼는지 확인한다.
 
 ## 5. Vercel에 배포
-1. Vercel에서 이 GitHub 레포를 Import.
-2. **Settings → Environment Variables**에 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `ANTHROPIC_API_KEY`를 넣는다.
-3. Deploy.
+Vercel 프로젝트 `readlog`가 이미 만들어져 있고 GitHub 레포와 연결돼 있다. 주소: https://readlog-coral.vercel.app
+
+1. Vercel 대시보드 → `readlog` 프로젝트 → **Settings → Environment Variables**에서 `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, (선택) `ANTHROPIC_API_KEY`를 **Production**(필요하면 Preview도)에 추가한다. `READLOG_TZ=Asia/Seoul`은 이미 들어 있다.
+2. 환경 변수는 새 배포부터 적용되므로 **Deployments → 최신 배포 ⋯ → Redeploy**를 누른다.
+3. 첫 화면에 "데이터베이스가 아직 연결되지 않았어요"가 사라지면 연결 완료.
+
+- **자동 배포:** 레포에 push하면 Vercel이 자동으로 배포한다. 지금 레포에는 `claude/article-archiving-service-vwpm7m` 브랜치만 있어서 push는 Preview로 배포된다. push가 곧바로 프로덕션(위 주소)에 반영되게 하려면 **Settings → Git → Production Branch**를 이 브랜치로 바꾸거나, 브랜치를 `main`으로 합친다.
+- CLI로 직접 배포: `npx vercel deploy --prod`
 
 > ⚠️ 지금은 로그인이나 비밀번호가 없다. 배포 URL을 아는 사람은 누구나 기록을 보고 쓰고 지울 수 있다. URL을 공유하지 말고, 공개가 필요해지면 접근 보호(비밀번호 또는 Supabase Auth)를 먼저 추가하자.
 
