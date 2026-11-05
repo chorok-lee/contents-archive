@@ -28,7 +28,7 @@ export type AnalyzeResult =
   | { ok: false; error: string };
 
 // Pages fetched before the extractor last changed are fetched again.
-const EXTRACTOR_UPDATED_AT = "2026-11-05T00:00:00Z";
+const EXTRACTOR_UPDATED_AT = "2026-11-05T15:25:00Z";
 
 function isFresh(article: Article): boolean {
   if (!article.bodyText) return false;
