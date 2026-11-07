@@ -81,14 +81,22 @@ const LOGIN_HOST = /^(kauth\.kakao\.com|nid\.naver\.com|accounts\.google\.com)$/
 export type FetchFailure = "login" | "unavailable";
 
 /** Follows redirects by hand so a detour through a login page is reported instead of followed. */
+/** One retry after a timeout or dropped connection; blog hosts are sometimes slow to answer. */
 async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string } | FetchFailure> {
+  const first = await fetchHtmlOnce(url);
+  if (first !== "retry") return first;
+  const second = await fetchHtmlOnce(url);
+  return second === "retry" ? "unavailable" : second;
+}
+
+async function fetchHtmlOnce(url: string): Promise<{ html: string; finalUrl: string } | FetchFailure | "retry"> {
   const host = new URL(url).hostname;
   let current = url;
   try {
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
       const res = await fetch(current, {
         redirect: "manual",
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(8_000),
         headers: BROWSER_HEADERS,
       });
       const location = res.headers.get("location");
@@ -118,7 +126,7 @@ async function fetchHtml(url: string): Promise<{ html: string; finalUrl: string 
   } catch (error) {
     const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
     console.warn(`[readlog] fetch ${host} failed ${reason}`);
-    return "unavailable";
+    return "retry"; // timeouts and network errors
   }
 }
 
