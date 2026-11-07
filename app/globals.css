@@ -197,6 +197,24 @@ body {
     color: #fff;
   }
 
+  /* iOS segmented control item */
+  .segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    border-radius: 10px;
+    color: var(--color-slate);
+    font-size: 15px;
+    font-weight: 600;
+    transition: background-color 150ms ease;
+  }
+  .segment[aria-selected="true"] {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  }
+
   .tag-chip {
     display: inline-flex;
     align-items: center;

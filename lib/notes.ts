@@ -2,7 +2,7 @@ import * as memory from "./notes.memory";
 import * as supabase from "./notes.supabase";
 import { isSupabaseConfigured } from "./supabase";
 
-export type { Article, Note } from "./notes.supabase";
+export type { Article, Note, NoteFilter, NoteStatus } from "./notes.supabase";
 
 const useMemory = process.env.NODE_ENV !== "production" && process.env.READLOG_FAKE_DB === "1";
 const store: typeof supabase = useMemory ? memory : supabase;
@@ -21,5 +21,6 @@ export const {
   getNote,
   listNotes,
   keywordCounts,
+  countLater,
   findNoteIdByUrl,
 } = store;

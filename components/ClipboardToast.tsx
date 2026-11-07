@@ -108,7 +108,7 @@ export function ClipboardToast({ suppressed, onAccept }: Props) {
   return (
     <div
       role="status"
-      className="animate-sheet-up fixed inset-x-0 bottom-[calc(max(24px,env(safe-area-inset-bottom))+80px)] z-20 mx-auto flex w-[calc(100%-32px)] max-w-md items-center gap-1 rounded-full bg-canvas/85 p-1.5 shadow-float backdrop-blur-xl"
+      className="animate-sheet-up fixed inset-x-0 bottom-[calc(max(16px,env(safe-area-inset-bottom))+150px)] z-20 mx-auto flex w-[calc(100%-32px)] max-w-md items-center gap-1 rounded-full bg-canvas/85 p-1.5 shadow-float backdrop-blur-xl"
     >
       <button type="button" onClick={accept} className="flex min-w-0 flex-1 items-center gap-3 rounded-full py-1.5 pr-2 pl-1.5 text-left active:scale-[0.98]">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-tint text-primary">

@@ -6,7 +6,12 @@
 - 최신 iOS 앱 느낌: 회색 그룹 배경(`bg-surface`) 위 흰 카드(`.card`, 24px), Large Title(34px bold), 시스템 폰트.
 - 토큰은 `app/globals.css`의 `@theme`에만 정의한다. 임의 hex 대신 `bg-primary`, `bg-tint`, `bg-fill`, `text-steel`, `border-hairline` 같은 클래스를 쓴다.
 - 버튼: 원형 툴바 버튼 `.glass-btn`(뒤로·삭제), 주요 동작 `.round-primary`(✓, ＋ FAB), 시트의 큰 CTA `.btn btn-dark`. 칩은 `.pill-tab`, 키워드는 `.tag-chip`.
-- 화면 구조: `/` 기록 피드 + ＋ FAB → 링크 시트(`LinkSheet`) → 느낀 점 에디터(`NoteEditor`, 하단 `BookmarkClip`). 수정은 `/notes/[id]`에서 같은 에디터.
+- 화면 구조: 하단 탭 바(`TabBar`) 「홈」「목록」.
+  - `/` 홈: 「링크 붙이기」 카드(`NewNoteFlow variant="hero"`), 나중에 읽기 개수, 최근 기록 3개
+  - `/list` 목록: 세그먼트 「읽은 글」(기본, 키워드 칩 `?k=`) | 「나중에 읽기」(`?tab=later`), ＋ FAB
+  - 링크 시트(`LinkSheet`): 1단계 링크 → 2단계 3줄 요약 + 「느낀 점 쓰기」(→ `NoteEditor`, 하단 `BookmarkClip`) / 「나중에 읽기」(바로 저장)
+  - `/notes/[id]`: 같은 에디터로 수정. 나중에 읽기 글은 빈 본문으로 열리고, 쓰면 읽은 글로 이동
+- "나중에 읽기" = `notes.reflection = ''`. 별도 컬럼 없음
 - 눌림 피드백(`active:scale`)과 safe-area 여백(`env(safe-area-inset-*)`)을 유지한다.
 - `DESIGN.md`(Notion 스타일)는 초기 참고 자료로만 남아 있다. 지금 규칙은 이 섹션이 우선.
 
@@ -18,7 +23,7 @@
 - `lib/keywords.ts` 고정 키워드 목록과 폴백 사전, `lib/notes.ts` 조회·저장(supabase-js), `lib/supabase.ts` 서버 전용 클라이언트(secret 키)
 - 스키마는 `supabase/migrations/`의 SQL. 바꿀 때는 새 번호 파일을 추가하고 `docs/SUPABASE.md`도 갱신
 - `lib/notes.ts`는 저장소 선택만 한다: 기본 Supabase(`notes.supabase.ts`), 개발 중 `READLOG_FAKE_DB=1`이면 메모리(`notes.memory.ts`, 재시작 시 초기화)
-- `app/actions.ts` 서버 액션, 화면: `/` 피드(키워드 칩 `?k=`), `/notes/[id]` 수정
+- `app/actions.ts` 서버 액션, 화면: `/` 홈, `/list` 목록, `/notes/[id]` 수정
 
 ## 확인
 - `npm run lint`, `npm run build`

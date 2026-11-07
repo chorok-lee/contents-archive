@@ -3,7 +3,7 @@
  * (READLOG_FAKE_DB=1): data lives in the server process and is lost on restart.
  */
 import { KEYWORDS, type Keyword } from "./keywords";
-import type { Article, Note } from "./notes.supabase";
+import type { Article, Note, NoteFilter } from "./notes.supabase";
 
 interface NoteRecord {
   id: number;
@@ -66,9 +66,16 @@ export async function createNote(articleId: number, reflection: string, keywords
   return id;
 }
 
-export async function updateNote(id: number, reflection: string, keywords: Keyword[]) {
+export async function updateNote(
+  id: number,
+  reflection: string,
+  keywords: Keyword[],
+  options: { markRead?: boolean } = {},
+) {
   const note = db.notes.find((n) => n.id === id);
-  if (note) Object.assign(note, { reflection, keywords, updatedAt: new Date().toISOString() });
+  if (!note) return;
+  const now = new Date().toISOString();
+  Object.assign(note, { reflection, keywords, updatedAt: now }, options.markRead ? { createdAt: now } : {});
 }
 
 export async function deleteNote(id: number) {
@@ -80,16 +87,23 @@ export async function getNote(id: number) {
   return note ? toNote(note) : null;
 }
 
-export async function listNotes(keyword?: Keyword) {
-  return db.notes
+export async function listNotes({ status, keyword, limit }: NoteFilter) {
+  const notes = db.notes
+    .filter((n) => (status === "later" ? n.reflection === "" : n.reflection !== ""))
     .filter((n) => !keyword || n.keywords.includes(keyword))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id)
     .map(toNote);
+  return limit ? notes.slice(0, limit) : notes;
+}
+
+export async function countLater() {
+  return db.notes.filter((n) => n.reflection === "").length;
 }
 
 export async function keywordCounts() {
+  const read = db.notes.filter((n) => n.reflection !== "");
   return KEYWORDS.flatMap((keyword) => {
-    const count = db.notes.filter((n) => n.keywords.includes(keyword)).length;
+    const count = read.filter((n) => n.keywords.includes(keyword)).length;
     return count ? [{ keyword, count }] : [];
   });
 }

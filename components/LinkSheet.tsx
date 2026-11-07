@@ -19,10 +19,12 @@ interface Props {
   notice?: string;
   onCancel: () => void;
   onAttach: (result: Analyzed) => void;
+  /** Saves the link without a reflection to the "read later" list. */
+  onSaveLater: (result: Analyzed) => Promise<{ ok: boolean; error?: string }>;
 }
 
 /** Two-step sheet: 1) paste the link, 2) check the 3-line summary, then attach it as a bookmark. */
-export function LinkSheet({ prefill, initial, startStep = 1, notice, onCancel, onAttach }: Props) {
+export function LinkSheet({ prefill, initial, startStep = 1, notice, onCancel, onAttach, onSaveLater }: Props) {
   const [step, setStep] = useState<1 | 2>(initial ? 2 : startStep);
   const viewport = useVisualViewport();
   const compact = viewport?.keyboardOpen ?? false;
@@ -30,6 +32,8 @@ export function LinkSheet({ prefill, initial, startStep = 1, notice, onCancel, o
   const [result, setResult] = useState<Analyzed | null>(initial);
   const [error, setError] = useState<string | null>(null);
   const [analyzing, startAnalyze] = useTransition();
+  const [savingLater, startSavingLater] = useTransition();
+  const [laterError, setLaterError] = useState<string | null>(null);
   const requestRef = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -189,7 +193,7 @@ export function LinkSheet({ prefill, initial, startStep = 1, notice, onCancel, o
               3줄 요약
             </h2>
             <p className="mt-2 text-center text-[17px] text-steel">
-              {analyzing ? "글을 읽고 있어요…" : "이 글을 북마크로 붙일게요"}
+              {analyzing ? "글을 읽고 있어요…" : "지금 느낀 점을 남기거나, 나중에 읽기로 저장해요"}
             </p>
 
             <div className="my-6">
@@ -205,13 +209,32 @@ export function LinkSheet({ prefill, initial, startStep = 1, notice, onCancel, o
               </p>
             )}
 
+            {laterError && (
+              <p role="alert" className="mb-2 text-center text-[15px] text-error">
+                {laterError}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => result && onAttach(result)}
-              disabled={analyzing || !result}
+              disabled={analyzing || !result || savingLater}
               className="btn btn-dark w-full"
             >
-              {analyzing ? "요약하는 중…" : "북마크 붙이기"}
+              {analyzing ? "요약하는 중…" : "느낀 점 쓰기"}
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                result &&
+                startSavingLater(async () => {
+                  const res = await onSaveLater(result);
+                  setLaterError(res.ok ? null : (res.error ?? "저장하지 못했어요."));
+                })
+              }
+              disabled={analyzing || !result || savingLater}
+              className="btn btn-secondary mt-2 min-h-14 w-full rounded-lg"
+            >
+              {savingLater ? "저장하는 중…" : "나중에 읽기"}
             </button>
           </div>
         )}

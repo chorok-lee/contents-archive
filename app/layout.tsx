@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
+import { TabBar } from "@/components/TabBar";
 
 export const metadata: Metadata = {
   title: { default: "Readlog", template: "%s · Readlog" },
@@ -18,9 +19,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ko">
       <body className="min-h-dvh">
-        <main className="mx-auto max-w-2xl px-4 pt-[max(20px,env(safe-area-inset-top))] pb-32">
+        <main className="mx-auto max-w-2xl px-4 pt-[max(20px,env(safe-area-inset-top))] pb-40">
           {children}
         </main>
+        <TabBar />
       </body>
     </html>
   );

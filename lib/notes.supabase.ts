@@ -169,10 +169,17 @@ export async function createNote(
   return data.id;
 }
 
-export async function updateNote(id: number, reflection: string, keywords: Keyword[]): Promise<void> {
+export async function updateNote(
+  id: number,
+  reflection: string,
+  keywords: Keyword[],
+  options: { markRead?: boolean } = {},
+): Promise<void> {
+  const now = new Date().toISOString();
   const { error } = await getSupabase()
     .from("notes")
-    .update({ reflection, updated_at: new Date().toISOString() })
+    // A "read later" item read now moves to the top of the read list.
+    .update({ reflection, updated_at: now, ...(options.markRead ? { created_at: now } : {}) })
     .eq("id", id);
   if (error) fail("기록 수정", error);
   await setKeywords(id, keywords);
@@ -193,10 +200,21 @@ export async function getNote(id: number): Promise<Note | null> {
   return data ? toNote(data) : null;
 }
 
-/** Newest first, optionally limited to one keyword. */
-export async function listNotes(keyword?: Keyword): Promise<Note[]> {
+export type NoteStatus = "read" | "later";
+
+export interface NoteFilter {
+  /** "read": has a reflection. "later": saved to read later (empty reflection). */
+  status: NoteStatus;
+  keyword?: Keyword;
+  limit?: number;
+}
+
+/** Newest first. */
+export async function listNotes({ status, keyword, limit }: NoteFilter): Promise<Note[]> {
   const supabase = getSupabase();
   let query = supabase.from("notes").select(NOTE_SELECT).order("created_at", { ascending: false });
+  query = status === "later" ? query.eq("reflection", "") : query.neq("reflection", "");
+  if (limit) query = query.limit(limit);
 
   if (keyword) {
     const { data: links, error } = await supabase
@@ -216,9 +234,21 @@ export async function listNotes(keyword?: Keyword): Promise<Note[]> {
   return data.map(toNote);
 }
 
-/** Keywords that have at least one note, in the fixed chip order. */
+export async function countLater(): Promise<number> {
+  const { count, error } = await getSupabase()
+    .from("notes")
+    .select("id", { count: "exact", head: true })
+    .eq("reflection", "");
+  if (error) fail("나중에 읽기 개수 조회", error);
+  return count ?? 0;
+}
+
+/** Keywords of read notes, in the fixed chip order. */
 export async function keywordCounts(): Promise<{ keyword: Keyword; count: number }[]> {
-  const { data, error } = await getSupabase().from("note_keywords").select("keyword");
+  const { data, error } = await getSupabase()
+    .from("note_keywords")
+    .select("keyword, note:notes!inner(reflection)")
+    .neq("note.reflection", "");
   if (error) fail("키워드 집계", error);
   const counts = new Map<string, number>();
   for (const { keyword } of data) counts.set(keyword, (counts.get(keyword) ?? 0) + 1);

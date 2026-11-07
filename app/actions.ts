@@ -98,19 +98,27 @@ async function analyze(url: string): Promise<AnalyzeResult> {
   };
 }
 
+/** Saves a note. With `later`, saves the link with no reflection to the "read later" list. */
 export async function saveNote(
   articleId: number,
   reflection: string,
-): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
-  const text = reflection.trim();
-  if (!text) return { ok: false, error: "느낀 점을 한 줄이라도 적어 주세요." };
+  options: { later?: boolean } = {},
+): Promise<{ ok: true; id: number; existing?: boolean } | { ok: false; error: string }> {
+  const text = options.later ? "" : reflection.trim();
+  if (!text && !options.later) return { ok: false, error: "느낀 점을 한 줄이라도 적어 주세요." };
   try {
     const article = await getArticle(articleId);
     if (!article) return { ok: false, error: "글 정보를 찾지 못했어요. URL을 다시 붙여넣어 주세요." };
 
+    if (options.later) {
+      // Already saved (to read later or read)? Don't add the same link twice.
+      const existing = await findNoteIdByUrl(article.url);
+      if (existing) return { ok: true, id: existing, existing: true };
+    }
     const keywords = await extractKeywords(article.title, article.bodyText || (article.description ?? ""), text);
     const id = await createNote(article.id, text, keywords);
     revalidatePath("/");
+    revalidatePath("/list");
     return { ok: true, id };
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
@@ -133,8 +141,10 @@ export async function updateReflection(
       article?.bodyText || (note.article.description ?? ""),
       text,
     );
-    await updateNote(id, text, keywords);
+    // Writing the first reflection on a "read later" item moves it to the read list.
+    await updateNote(id, text, keywords, { markRead: note.reflection === "" });
     revalidatePath("/");
+    revalidatePath("/list");
     revalidatePath(`/notes/${id}`);
     return { ok: true };
   } catch (error) {
@@ -142,8 +152,9 @@ export async function updateReflection(
   }
 }
 
-export async function removeNote(id: number): Promise<void> {
+export async function removeNote(id: number, returnTo: "read" | "later" = "read"): Promise<void> {
   await deleteNote(id);
   revalidatePath("/");
-  redirect("/");
+  revalidatePath("/list");
+  redirect(returnTo === "later" ? "/list?tab=later" : "/list");
 }
